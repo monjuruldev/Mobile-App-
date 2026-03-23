@@ -4,10 +4,10 @@ import 'models.dart';
 import 'app_theme.dart';
 
 class AppState extends ChangeNotifier {
+  // ── Auth ─────────────────────────
   bool _loggedIn = false;
   AppUser _user = AppUser();
 
-  bool get loggedIn => _loggedIn;
   bool get isLoggedIn => _loggedIn;
   AppUser get user => _user;
 
@@ -23,14 +23,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateProfile({String? name, String? email}) {
-    if (name != null) _user.name = name;
-    if (email != null) _user.email = email;
-    notifyListeners();
-  }
-
+  // ── Favorites ───────────────────
   final Set<String> _favs = {};
-  Set<String> get favs => Set.unmodifiable(_favs);
+
   List<String> get favorites => _favs.toList();
 
   bool isFav(String id) => _favs.contains(id);
@@ -40,44 +35,67 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Cart ────────────────────────
   final List<CartItem> _cart = [];
-  String _coupon = '';
-  double _saving = 0;
-  bool _freeDel = false;
 
   List<CartItem> get cart => List.unmodifiable(_cart);
-  int get cartCount => _cart.fold(0, (s, c) => s + c.qty);
-  bool get cartEmpty => _cart.isEmpty;
 
-  String get coupon => _coupon;
-  double get saving => _saving;
-  bool get freeDel => _freeDel;
-
-  double get subtotal => _cart.fold(0.0, (s, c) => s + c.total);
-
-  double get deliveryFee {
-    if (_freeDel || subtotal >= RC.freeDelMin) return 0;
-    return RC.deliveryFee;
+  int qtyOf(String id) {
+    final i = _cart.indexWhere((c) => c.item.id == id);
+    return i >= 0 ? _cart[i].qty : 0;
   }
 
-  double get tax => (subtotal - _saving).clamp(0.0, double.infinity) * RC.taxRate;
+  void add(FoodItem item) {
+    final i = _cart.indexWhere((c) => c.item.id == item.id);
+    if (i >= 0) {
+      _cart[i].qty++;
+    } else {
+      _cart.add(CartItem(item: item));
+    }
+    notifyListeners();
+  }
 
-  double get total => subtotal - _saving + deliveryFee + tax;
+  void remove(FoodItem item) {
+    final i = _cart.indexWhere((c) => c.item.id == item.id);
+    if (i >= 0) {
+      if (_cart[i].qty > 1) {
+        _cart[i].qty--;
+      } else {
+        _cart.removeAt(i);
+      }
+      notifyListeners();
+    }
+  }
+
+  double get total => _cart.fold(0.0, (s, c) => s + c.total);
+
+  void clearCart() {
+    _cart.clear();
+    notifyListeners();
+  }
+
+  // ── Orders ──────────────────────
+  final List<Order> _orders = [];
+
+  List<Order> get orders => List.unmodifiable(_orders);
 
   Order placeOrder({required String address, required String payment}) {
     final order = Order(
       id: Uuid().v4().substring(0, 8).toUpperCase(),
-      items: _cart.map((c) => CartItem(item: c.item, qty: c.qty, note: c.note)).toList(),
-      subtotal: subtotal,
-      deliveryFee: deliveryFee,
-      tax: tax,
-      discount: _saving,
+      items: _cart.map((c) => CartItem(item: c.item, qty: c.qty)).toList(),
+      subtotal: total,
+      deliveryFee: 0,
+      tax: 0,
+      discount: 0,
       total: total,
       placedAt: DateTime.now(),
       address: address,
       payment: payment,
-      coupon: _coupon.isEmpty ? null : _coupon,
     );
+
+    _orders.add(order);
+    clearCart();
+    notifyListeners();
 
     return order;
   }
