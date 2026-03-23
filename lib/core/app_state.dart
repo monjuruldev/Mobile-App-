@@ -181,7 +181,7 @@ class AppState extends ChangeNotifier {
     // Assign random table
     final table = (_reservations.length % RC.totalTables) + 1;
     final r = Reservation(
-      id: const Uuid().v4().substring(0, 6).toUpperCase(),
+      id: Uuid().v4().substring(0, 6).toUpperCase(),
       customerName: name,
       phone: phone,
       dateTime: dateTime,
